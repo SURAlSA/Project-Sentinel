@@ -1,0 +1,676 @@
+Project Sentinel
+Development Milestones
+======================
+
+Purpose
+-------
+
+This document is a decision guide for developing Project Sentinel from its
+initial scaffold into a reliable Linux telemetry and system-health platform.
+Milestones should be completed in order unless a later milestone is needed
+for a specific experiment.
+
+Each milestone should normally be implemented as one or more focused changes,
+with tests and documentation updated at the same time.
+
+
+Milestone 0: Project foundation
+-------------------------------
+
+Status: Initial scaffold complete
+
+Objectives:
+
+  - Establish the repository and licensing.
+  - Define the C17/CMake build.
+  - Add the initial userspace daemon.
+  - Add the kernel-module skeleton.
+  - Add initial architecture and design documentation.
+  - Add GitHub Actions build and test automation.
+
+Current deliverables:
+
+  - CMake project
+  - sentineld executable
+  - CTest integration
+  - shared version header
+  - example configuration file
+  - kernel Makefile and module skeleton
+  - command reference
+
+Exit criteria:
+
+  - The project configures and builds with CMake.
+  - CTest passes.
+  - sentineld supports --help, --version, and --config.
+  - CI can build and test the userspace project.
+
+
+Milestone 1: Telemetry data model
+---------------------------------
+
+Objectives:
+
+  - Define a common representation for telemetry samples.
+  - Use the same representation across collectors, storage, alerts, and
+    future remote APIs.
+  - Define metric names or metric types, values, units, and timestamps.
+
+Suggested deliverables:
+
+  - common/include/sentinel/telemetry.h
+  - common/src/telemetry.c, if implementation is required
+  - tests/test_telemetry.c
+
+Recommended sample fields:
+
+  - metric type or name
+  - numeric value
+  - unit
+  - timestamp
+  - optional source or sensor identifier
+
+Exit criteria:
+
+  - The data model is documented.
+  - Samples can be initialized and validated.
+  - Tests cover valid, empty, and invalid samples.
+  - The model does not depend on a specific collector or database.
+
+
+Milestone 2: Userspace collector interface
+-------------------------------------------
+
+Objectives:
+
+  - Define a small interface for independent telemetry collectors.
+  - Keep collection separate from scheduling, storage, and alerting.
+  - Make collectors replaceable and testable.
+
+Suggested deliverables:
+
+  - daemon/include/sentinel/collector.h
+  - daemon/src/collector.c
+  - collector registration or dispatch logic
+  - tests for collector behavior
+
+Exit criteria:
+
+  - A collector can be invoked without knowing how its output is stored.
+  - Collector failures are reported explicitly.
+  - The interface supports adding more collectors without changing the
+    daemon's core loop.
+
+
+Milestone 3: CPU and memory telemetry
+--------------------------------------
+
+Objectives:
+
+  - Implement the first real telemetry sources in userspace.
+  - Collect CPU utilization and memory utilization on Linux.
+  - Avoid requiring a custom kernel module for metrics already exposed by
+    standard Linux interfaces.
+
+Suggested sources:
+
+  - /proc/stat for CPU utilization
+  - /proc/meminfo for memory statistics
+
+Suggested deliverables:
+
+  - daemon/src/cpu_collector.c
+  - daemon/src/memory_collector.c
+  - deterministic parser tests
+  - sample output from sentineld
+
+Exit criteria:
+
+  - CPU and memory values are normalized into telemetry samples.
+  - Parsing handles malformed or incomplete input safely.
+  - Tests do not depend directly on the host's current /proc values.
+  - The daemon can display collected values.
+
+
+Milestone 4: Configuration system
+---------------------------------
+
+Objectives:
+
+  - Make the configuration file functional.
+  - Validate settings before the daemon starts.
+  - Provide safe defaults and useful error messages.
+
+Initial settings:
+
+  - sampling interval
+  - database path
+  - log level
+  - remote telemetry enablement
+
+Suggested deliverables:
+
+  - daemon/include/sentinel/config.h
+  - daemon/src/config.c
+  - configuration validation
+  - tests/test_config.c
+
+Important behavior:
+
+  - Missing files should produce an actionable error.
+  - Invalid values should not be silently ignored.
+  - Sampling intervals should have sensible lower and upper bounds.
+  - Paths and permissions should be checked where practical.
+
+Exit criteria:
+
+  - sentineld loads the selected configuration file.
+  - Invalid configuration prevents unsafe startup.
+  - Tests cover valid, missing, and malformed configuration.
+  - The active configuration is visible in diagnostic output.
+
+
+Milestone 5: Sampling and daemon lifecycle
+-------------------------------------------
+
+Objectives:
+
+  - Turn the daemon placeholder into a real sampling process.
+  - Run collectors at the configured interval.
+  - Preserve clean startup and shutdown behavior.
+
+Suggested deliverables:
+
+  - monotonic sampling scheduler
+  - collector dispatch
+  - signal-safe shutdown flag
+  - structured logging of samples
+  - lifecycle tests where practical
+
+Exit criteria:
+
+  - The daemon samples at the configured interval.
+  - SIGINT and SIGTERM stop the daemon cleanly.
+  - A failed collector does not silently terminate the whole process.
+  - Scheduling does not drift unnecessarily over time.
+  - CPU overhead remains appropriate for embedded devices.
+
+
+Milestone 6: Test framework expansion
+-------------------------------------
+
+Objectives:
+
+  - Build confidence before adding persistence and networking.
+  - Keep hardware and operating-system parsing deterministic.
+
+Suggested deliverables:
+
+  - tests/CMakeLists.txt
+  - parser fixtures
+  - unit tests for telemetry, configuration, collectors, and scheduling
+  - CI execution of the complete test suite
+
+Test categories:
+
+  - valid input
+  - missing input
+  - malformed input
+  - boundary values
+  - system-call failures
+  - shutdown behavior
+  - repeated sampling
+
+Exit criteria:
+
+  - New functionality has focused tests.
+  - Tests run consistently on developer machines and CI.
+  - Tests do not require special production hardware.
+
+
+Milestone 7: Historical storage
+--------------------------------
+
+Objectives:
+
+  - Persist telemetry for later analysis.
+  - Use an embedded-friendly database.
+  - Keep storage behind a small module interface.
+
+Recommended technology:
+
+  - SQLite
+
+Suggested deliverables:
+
+  - daemon/include/sentinel/storage.h
+  - daemon/src/storage.c
+  - database initialization
+  - schema migrations or schema versioning
+  - prepared insert statements
+  - storage tests
+
+Initial data fields:
+
+  - timestamp
+  - metric type
+  - value
+  - unit
+  - optional source
+
+Exit criteria:
+
+  - The database is created safely.
+  - Telemetry samples can be inserted and read back.
+  - Database errors are surfaced clearly.
+  - Writes are bounded and suitable for long-running embedded systems.
+  - Corruption and restart behavior are documented and tested.
+
+
+Milestone 8: Logging and retention
+----------------------------------
+
+Objectives:
+
+  - Provide reliable diagnostic and event logging.
+  - Prevent unbounded disk usage.
+  - Separate operational logs from telemetry data where appropriate.
+
+Suggested deliverables:
+
+  - logging module
+  - log levels
+  - timestamps and component names
+  - rotation or retention policy
+  - error and recovery messages
+
+Exit criteria:
+
+  - Logs identify failures and relevant subsystems.
+  - Log output can be configured.
+  - Retention behavior is documented.
+  - Logging does not overwhelm the storage device.
+
+
+Milestone 9: Threshold alert engine
+-----------------------------------
+
+Objectives:
+
+  - Detect immediate health concerns using explicit rules.
+  - Keep alert evaluation independent from data collection.
+  - Establish warning and critical severity levels.
+
+Initial alert candidates:
+
+  - high CPU temperature
+  - critical CPU temperature
+  - high memory utilization
+  - low disk space
+  - sensor read failure
+  - repeated process or service failure
+
+Suggested deliverables:
+
+  - daemon/include/sentinel/alert.h
+  - daemon/src/alert.c
+  - alert configuration
+  - alert state and de-duplication
+  - alert tests
+
+Exit criteria:
+
+  - Rules are configurable and validated.
+  - Repeated samples do not create uncontrolled alert storms.
+  - Alerts include metric, threshold, value, timestamp, and severity.
+  - Alert events can be logged and stored.
+
+
+Milestone 10: Expanded hardware and operating-system monitoring
+----------------------------------------------------------------
+
+Objectives:
+
+  - Expand coverage after the core collection path is stable.
+  - Prefer standard Linux interfaces before adding kernel code.
+
+Potential collectors:
+
+  - CPU frequency
+  - temperatures
+  - disk utilization
+  - network throughput and errors
+  - process usage
+  - uptime and boot history
+  - service failures
+  - battery health
+  - fan speed
+  - SMART data
+
+Recommended order:
+
+  1. /proc and /sys metrics
+  2. filesystem and process statistics
+  3. network statistics
+  4. sensors and power information
+  5. SMART and hardware-specific sources
+
+Exit criteria:
+
+  - Each collector has a documented source and failure mode.
+  - Unsupported hardware is handled explicitly.
+  - Platform-specific code is isolated.
+  - Tests use fixtures rather than requiring identical hardware.
+
+
+Milestone 11: Kernel/userspace telemetry interface
+---------------------------------------------------
+
+Objectives:
+
+  - Add kernel support only for metrics unavailable through existing Linux
+    interfaces.
+  - Define a stable, minimal boundary between kernel and userspace.
+  - Keep expensive analysis and persistence out of the kernel.
+
+Possible interfaces:
+
+  - Netlink
+  - character device
+  - sysfs
+  - tracepoints or existing kernel APIs
+
+Exit criteria:
+
+  - The interface is documented.
+  - Input validation and permissions are defined.
+  - Kernel failures cannot corrupt userspace storage.
+  - The module has a clear unload and recovery behavior.
+  - Kernel code is tested against supported kernel versions where possible.
+
+
+Milestone 12: Remote telemetry
+------------------------------
+
+Objectives:
+
+  - Transmit selected telemetry and alert data to external systems.
+  - Keep remote communication optional and isolated from local monitoring.
+  - Preserve operation when the network is unavailable.
+
+Possible protocols:
+
+  - HTTPS REST
+  - MQTT
+  - WebSocket
+  - gRPC
+
+Recommended first implementation:
+
+  - Begin with a small HTTPS or REST client only after local storage and
+    alerting are stable.
+
+Required concerns:
+
+  - encryption
+  - authentication
+  - certificate validation
+  - retry and backoff
+  - local buffering
+  - bandwidth limits
+  - credential protection
+
+Exit criteria:
+
+  - Network failure does not stop local collection.
+  - Credentials are not stored in source code or logs.
+  - Transport security is verified.
+  - Remote delivery status is observable.
+
+
+Milestone 13: Trend analysis
+----------------------------
+
+Objectives:
+
+  - Identify gradual degradation from historical data.
+  - Start with explainable statistical methods.
+  - Keep analysis deterministic and resource-conscious.
+
+Initial techniques:
+
+  - moving averages
+  - rolling minimum and maximum
+  - baseline comparison
+  - rate-of-change detection
+  - regression detection
+
+Initial targets:
+
+  - increasing temperatures
+  - rising memory use
+  - increasing boot time
+  - declining network performance
+  - battery degradation
+  - performance changes after software updates
+
+Exit criteria:
+
+  - Analysis uses stored telemetry.
+  - Alerts explain the condition that triggered them.
+  - False positives and thresholds are documented.
+  - CPU, memory, and storage costs are measured.
+
+
+Milestone 14: Reliability and recovery
+---------------------------------------
+
+Objectives:
+
+  - Support continuous operation for long periods.
+  - Recover from ordinary subsystem failures.
+  - Protect data and maintain useful diagnostics.
+
+Areas to address:
+
+  - restart behavior
+  - database recovery
+  - unavailable sensors
+  - full disks
+  - network outages
+  - malformed configuration
+  - collector timeouts
+  - process supervision
+  - graceful shutdown
+
+Exit criteria:
+
+  - Failure scenarios are documented and tested.
+  - The daemon does not silently lose critical errors.
+  - Recovery behavior is bounded and predictable.
+  - Persistent data remains usable after restart.
+
+
+Milestone 15: Security hardening
+--------------------------------
+
+Objectives:
+
+  - Apply least privilege.
+  - Protect local data and remote credentials.
+  - Reduce attack surface before production deployment.
+
+Areas to address:
+
+  - dedicated service user
+  - filesystem permissions
+  - secure configuration permissions
+  - privilege separation
+  - input validation
+  - dependency review
+  - authenticated and encrypted remote transport
+  - secure defaults
+
+Exit criteria:
+
+  - The daemon does not run with unnecessary privileges.
+  - Secrets are excluded from logs and source control.
+  - Remote transport validates peer identity.
+  - Security assumptions are documented.
+
+
+Milestone 16: Service packaging and deployment
+----------------------------------------------
+
+Objectives:
+
+  - Make Sentinel installable and manageable on supported Linux systems.
+  - Provide a safe service definition.
+  - Document upgrades and removal.
+
+Suggested deliverables:
+
+  - systemd service file
+  - installation paths
+  - configuration directory
+  - data directory
+  - log integration
+  - package or install instructions
+
+Exit criteria:
+
+  - The service starts, stops, and restarts predictably.
+  - The service runs with documented privileges.
+  - Configuration and data paths are correct.
+  - Installation does not overwrite user data unexpectedly.
+
+
+Milestone 17: Performance and portability
+------------------------------------------
+
+Objectives:
+
+  - Validate the non-functional requirements from the project scope.
+  - Support the intended Linux architectures.
+
+Target platforms:
+
+  - ARM
+  - ARM64
+  - x86
+  - x86_64
+  - embedded Linux distributions
+
+Measurements:
+
+  - CPU overhead
+  - memory footprint
+  - disk write rate
+  - database growth
+  - sampling latency
+  - network bandwidth
+  - recovery time
+
+Exit criteria:
+
+  - Resource usage is measured rather than assumed.
+  - Platform-specific limitations are documented.
+  - The project remains usable on Raspberry Pi-class hardware.
+  - CI or documented test environments cover supported targets.
+
+
+Milestone 18: Release readiness
+-------------------------------
+
+Objectives:
+
+  - Prepare a stable, documented release.
+  - Make the project understandable to external contributors and users.
+
+Suggested deliverables:
+
+  - versioned release
+  - complete build instructions
+  - configuration reference
+  - API documentation
+  - security documentation
+  - troubleshooting guide
+  - changelog
+  - contribution guidelines
+  - issue templates
+  - reproducible CI checks
+
+Exit criteria:
+
+  - A new developer can build and test the project from a clean checkout.
+  - A new operator can install and configure the daemon.
+  - Supported features and limitations are explicit.
+  - Known risks and unsupported hardware are documented.
+
+
+Features intentionally deferred
+-------------------------------
+
+These should not drive early implementation:
+
+  - machine learning
+  - cloud infrastructure
+  - Windows support
+  - macOS support
+  - desktop GUI
+  - mobile applications
+  - fleet management
+  - OTA update infrastructure
+  - plugin ecosystem
+
+They may become future projects after the local telemetry, storage, alerting,
+reliability, and security foundations are mature.
+
+
+Recommended immediate sequence
+------------------------------
+
+The next practical sequence is:
+
+  1. Telemetry data model
+  2. Collector interface
+  3. CPU and memory collectors
+  4. Configuration loader
+  5. Sampling loop
+  6. Expanded unit tests
+  7. SQLite storage
+  8. Logging and retention
+  9. Threshold alerts
+ 10. Additional collectors
+ 11. Kernel interface, only if needed
+ 12. Remote telemetry
+ 13. Trend analysis
+ 14. Reliability and recovery
+ 15. Security hardening
+ 16. Service packaging
+ 17. Performance and portability
+ 18. Release readiness
+
+
+Suggested commit progression
+----------------------------
+
+  Add telemetry sample model
+  Add collector interface
+  Add CPU telemetry collector
+  Add memory telemetry collector
+  Add configuration loader
+  Add daemon sampling loop
+  Expand collector and configuration tests
+  Add SQLite telemetry storage
+  Add structured logging and retention
+  Add threshold alert engine
+  Add network and storage collectors
+  Add kernel telemetry interface
+  Add remote telemetry transport
+  Add trend analysis
+  Add recovery handling
+  Harden daemon permissions and secrets
+  Add systemd packaging
+  Document supported platforms and performance
+  Prepare first release

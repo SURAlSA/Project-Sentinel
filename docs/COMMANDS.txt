@@ -1,0 +1,290 @@
+Project Sentinel
+Command and Development Guide
+================================
+
+This file documents the current boilerplate implementation and the commands
+needed to build, test, run, and publish it.
+
+
+1. What currently exists
+------------------------
+
+Project Sentinel is currently an early C17/CMake scaffold. It does not collect
+real telemetry yet.
+
+The current components are:
+
+  CMakeLists.txt
+      Root CMake project. Sets the project version to 0.1.0, requires C17,
+      enables CTest, and applies compiler warnings.
+
+  daemon/src/main.c
+      A userspace daemon placeholder named "sentineld". It:
+        - accepts --config PATH
+        - accepts --version
+        - accepts --help
+        - installs SIGINT and SIGTERM handlers
+        - stays running until it receives a shutdown signal
+        - prints startup and shutdown messages
+      It does not yet parse the TOML file or collect telemetry.
+
+  daemon/CMakeLists.txt
+      Builds the sentineld executable and registers a basic CTest test.
+
+  common/include/sentinel/version.h
+      Shared project name and version constants.
+
+  kernel/sentinel.c
+      Minimal Linux kernel module skeleton. Loading and unloading the module
+      currently only writes a message to the kernel log.
+
+  kernel/Makefile
+      Wrapper around the Linux kernel build system for the module.
+
+  config/sentinel.toml
+      Example configuration values. The daemon currently accepts the path but
+      does not parse these values yet.
+
+  .github/workflows/ci.yml
+      GitHub Actions workflow that configures, builds, and runs CTest on pushes
+      and pull requests.
+
+
+2. Required tools
+-----------------
+
+For the userspace project:
+
+  - Git
+  - CMake 3.16 or newer
+  - A C compiler with C17 support
+  - Make or another CMake-supported build tool
+
+For the kernel module:
+
+  - Linux
+  - Matching Linux kernel headers
+  - Kernel build tools
+
+On Debian/Ubuntu, the usual packages are:
+
+  sudo apt update
+  sudo apt install build-essential cmake git linux-headers-$(uname -r)
+
+
+3. Configure and build
+----------------------
+
+Run these commands from the repository root:
+
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+  cmake --build build --parallel
+
+The first command generates the build directory. The second compiles the
+sentineld executable.
+
+For a clean rebuild, remove only the generated build directory and configure
+again:
+
+  rm -rf build
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+  cmake --build build --parallel
+
+The build directory is ignored by Git through .gitignore.
+
+
+4. Test
+-------
+
+Run the registered tests with:
+
+  ctest --test-dir build --output-on-failure
+
+The current test verifies that the daemon can report its version successfully.
+The test suite will grow as telemetry and other subsystems are implemented.
+
+The equivalent complete local check is:
+
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+  cmake --build build --parallel
+  ctest --test-dir build --output-on-failure
+
+
+5. Run the daemon
+-----------------
+
+Print the version:
+
+  ./build/daemon/sentineld --version
+
+Print command-line help:
+
+  ./build/daemon/sentineld --help
+
+Start with the example configuration path:
+
+  ./build/daemon/sentineld --config config/sentinel.toml
+
+The daemon currently runs in the foreground. Stop it with Ctrl+C, or send
+SIGTERM from another terminal:
+
+  kill -TERM <process-id>
+
+At this stage, startup output explains that telemetry collection is not enabled
+yet. This is expected for the boilerplate.
+
+
+6. Build the kernel module
+--------------------------
+
+The kernel module is separate from the CMake userspace build.
+
+From the kernel directory:
+
+  make
+
+This uses:
+
+  /lib/modules/$(uname -r)/build
+
+To use a different kernel build directory:
+
+  make KERNEL_DIR=/path/to/kernel/build
+
+Clean generated kernel-module files:
+
+  make clean
+
+Building a kernel module generally requires matching kernel headers and may
+require elevated privileges only for loading or installing the module. Do not
+load an unreviewed kernel module on a production system.
+
+
+7. Inspect the working tree
+---------------------------
+
+Check changed and untracked files:
+
+  git status
+
+Show the actual diff:
+
+  git diff
+
+List files while excluding the generated build directory:
+
+  find . -path './build' -prune -o -type f -print
+
+
+8. Create the first local Git commit
+------------------------------------
+
+If this directory has not been initialized as a repository yet:
+
+  git init
+  git branch -M main
+
+Set the author identity if Git requests it:
+
+  git config user.name "Your Name"
+  git config user.email "you@example.com"
+
+Review what will be staged:
+
+  git status
+  git add .
+  git status
+
+Create the initial commit:
+
+  git commit -m "Initialize Project Sentinel scaffold"
+
+Review the commit:
+
+  git log --oneline --decorate --stat -1
+
+The generated build directory is excluded by .gitignore and should not be
+included in the commit.
+
+
+9. Connect to GitHub and push
+-----------------------------
+
+Create an empty repository on GitHub first. Do not add a second README,
+license, or .gitignore there because those files already exist locally.
+
+Then configure the GitHub remote. Replace the URL with the repository you
+created:
+
+  git remote add origin https://github.com/USERNAME/REPOSITORY.git
+
+Verify it:
+
+  git remote -v
+
+Push the main branch and remember the upstream:
+
+  git push -u origin main
+
+For SSH instead of HTTPS:
+
+  git remote add origin git@github.com:USERNAME/REPOSITORY.git
+  git push -u origin main
+
+Authentication is handled by GitHub credentials, a credential manager, or an
+SSH key. Never put a personal access token directly into source files or
+commit it to the repository.
+
+
+10. Normal development cycle
+----------------------------
+
+After editing code:
+
+  git status
+  cmake --build build --parallel
+  ctest --test-dir build --output-on-failure
+  git diff
+  git add <specific-files>
+  git commit -m "Describe the change"
+  git push
+
+If the build directory does not exist, configure it first:
+
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+To get the latest remote changes before starting new work:
+
+  git pull --ff-only
+
+
+11. GitHub Actions
+------------------
+
+The workflow in .github/workflows/ci.yml runs automatically for pushes and
+pull requests. It performs:
+
+  1. Repository checkout
+  2. CMake configure
+  3. Parallel build
+  4. CTest with failure output
+
+You can view the result in the repository's GitHub Actions tab.
+
+
+12. Current limitations and next steps
+--------------------------------------
+
+This scaffold intentionally does not yet:
+
+  - read or validate TOML configuration
+  - collect CPU, memory, disk, network, or sensor telemetry
+  - persist data in SQLite
+  - expose a REST or MQTT interface
+  - generate alerts
+  - perform trend or anomaly analysis
+  - install a systemd service
+  - provide production kernel telemetry interfaces
+
+The safest next implementation step is a small userspace collector, with
+focused tests, before adding persistent storage or remote communication.
