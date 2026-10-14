@@ -8,3 +8,4 @@ compile_commands.json
 Module.symvers
 modules.order
 __pycache__/
+.vscode/
