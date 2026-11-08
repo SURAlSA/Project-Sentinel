@@ -18,4 +18,9 @@ add_compile_options(
     $<$<COMPILE_LANG_AND_ID:C,GNU,Clang>:-Wpedantic>
 )
 
+add_subdirectory(common)
 add_subdirectory(daemon)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

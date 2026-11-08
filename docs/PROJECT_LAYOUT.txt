@@ -1,0 +1,57 @@
+Project Sentinel repository layout
+==================================
+
+Root
+----
+Project-wide CMake build, README, licence, and initial project-scope PDF.
+
+common/
+-------
+Shared headers and code used by multiple components. The sentinel/ include
+directory currently contains the project version header.
+
+config/
+-------
+Example Sentinel configuration. The daemon accepts a config path but does not
+parse this file yet.
+
+daemon/
+-------
+The userspace daemon. src/ contains the command-line/lifecycle scaffold and an
+unfinished CPU-reading stub. include/ is reserved for public daemon interfaces.
+
+docs/
+-----
+Roadmap, development milestones, architecture and design notes, API notes, and
+build/development commands.
+
+examples/
+---------
+Reserved for sample configurations, usage, or integrations; currently empty.
+
+kernel/
+-------
+The separate Linux kernel module skeleton and its kernel-build Makefile. The
+module currently logs load/unload messages only.
+
+scripts/
+--------
+Reserved for development or maintenance scripts; currently empty.
+
+tests/
+------
+Reserved for tests beyond the single CTest version check; currently empty.
+
+.github/workflows/
+------------------
+GitHub Actions CI workflow for configuring, building, and testing the CMake
+userspace project.
+
+.vscode/
+--------
+VS Code C/C++ workspace settings.
+
+build/
+------
+Generated local CMake build output. Not source; recreate with CMake and do not
+commit it.
