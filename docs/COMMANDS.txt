@@ -24,18 +24,24 @@ The current components are:
         - accepts --version
         - accepts --help
         - installs SIGINT and SIGTERM handlers
-        - samples CPU and memory telemetry once per second
+        - loads and validates the selected configuration file before startup
+        - samples CPU and memory telemetry at the configured interval
         - displays successful samples and reports collection errors
         - stays running until it receives a shutdown signal
 
   daemon/CMakeLists.txt
-      Builds the daemon and collector library.
+      Builds the daemon, collector library, and configuration loader.
 
   daemon/include/sentinel/
-      Public collector interface and CPU/memory collector declarations.
+      Public config and collector interfaces, plus CPU/memory collector
+      declarations.
 
   daemon/src/cpu_collector.c and memory_collector.c
       Parse Linux procfs data and produce utilization telemetry samples.
+
+  daemon/src/config.c
+      Loads the supported configuration settings and rejects malformed,
+      duplicate, unknown, or out-of-range values.
 
   common/include/sentinel/version.h
       Shared project name and version constants.
@@ -48,8 +54,8 @@ The current components are:
       Wrapper around the Linux kernel build system for the module.
 
   config/sentinel.toml
-      Example configuration values. The daemon currently accepts the path but
-      does not parse these values yet.
+      Example daemon configuration. The supported settings are sampling
+      interval, database path, log level, and remote telemetry enablement.
 
   .github/workflows/ci.yml
       GitHub Actions workflow that configures, builds, and runs CTest on pushes
@@ -137,8 +143,14 @@ SIGTERM from another terminal:
 
   kill -TERM <process-id>
 
-At this stage, startup output explains that telemetry collection is not enabled
-yet. This is expected for the boilerplate.
+The selected configuration is loaded before startup. The daemon prints the
+active settings and then reports CPU and memory utilization. Missing or invalid
+configuration prevents startup. Sampling intervals must be between 100 and
+60000 milliseconds. Log levels are debug, info, warn, or error.
+
+The database path is validated as a non-empty quoted path but is not opened
+until storage is implemented. Enabling remote telemetry is reported as
+configured but does not enable network communication yet.
 
 
 6. Build the kernel module
@@ -284,7 +296,6 @@ You can view the result in the repository's GitHub Actions tab.
 
 This scaffold intentionally does not yet:
 
-  - read or validate TOML configuration
   - collect disk, network, or hardware-sensor telemetry
   - persist data in SQLite
   - expose a REST or MQTT interface

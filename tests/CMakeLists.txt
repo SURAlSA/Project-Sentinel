@@ -19,3 +19,14 @@ target_link_libraries(test_collectors
 )
 
 add_test(NAME collectors COMMAND test_collectors)
+
+add_executable(test_config
+    test_config.c
+)
+
+target_link_libraries(test_config
+    PRIVATE
+        sentinel_collectors
+)
+
+add_test(NAME config COMMAND test_config)

@@ -8,17 +8,18 @@ Project-wide CMake build, README, licence, and initial project-scope PDF.
 common/
 -------
 Shared headers and code used by multiple components. The sentinel/ include
-directory currently contains the project version header.
+directory contains the project version and telemetry sample headers; src/
+contains shared telemetry implementation.
 
 config/
 -------
-Example Sentinel configuration. The daemon accepts a config path but does not
-parse this file yet.
+Example Sentinel configuration loaded and validated by the daemon.
 
 daemon/
 -------
-The userspace daemon. src/ contains the command-line/lifecycle scaffold and an
-unfinished CPU-reading stub. include/ is reserved for public daemon interfaces.
+The userspace daemon. include/sentinel/ contains config and collector
+interfaces. src/ contains startup/lifecycle code, configuration loading, and
+CPU/memory procfs collectors.
 
 docs/
 -----
@@ -40,7 +41,8 @@ Reserved for development or maintenance scripts; currently empty.
 
 tests/
 ------
-Reserved for tests beyond the single CTest version check; currently empty.
+CTest programs for telemetry samples, collector behavior/parsing, and
+configuration loading and validation.
 
 .github/workflows/
 ------------------
