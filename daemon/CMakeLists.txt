@@ -1,5 +1,6 @@
 add_library(sentinel_collectors
     src/collector.c
+    src/config.c
     src/cpu_collector.c
     src/memory_collector.c
 )

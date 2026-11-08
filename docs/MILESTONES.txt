@@ -141,6 +141,8 @@ Exit criteria:
 Milestone 4: Configuration system
 ---------------------------------
 
+Status: Complete
+
 Objectives:
 
   - Make the configuration file functional.

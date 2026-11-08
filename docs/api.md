@@ -51,17 +51,22 @@ The initial implementation will likely begin with REST before expanding to MQTT 
 
 ## Configuration
 
-Configuration will use TOML.
+Configuration uses a TOML-style file with the following supported settings:
 
 Example:
 
 ```toml
-sampling_interval = 1000
-
-database = "/var/lib/sentinel/data.db"
-
-enable_network = true
+sampling_interval_ms = 1000
+database_path = "/var/lib/sentinel/data.db"
+log_level = "info"
+enable_remote_telemetry = false
 ```
+
+The sampling interval must be from 100 through 60000 milliseconds. Log level
+must be `debug`, `info`, `warn`, or `error`. Missing settings use defaults.
+Unknown or duplicate settings and malformed values cause startup to fail.
+Remote telemetry is not implemented yet; enabling it is currently diagnostic
+configuration only.
 
 ---
 
