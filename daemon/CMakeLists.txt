@@ -1,3 +1,20 @@
+add_library(sentinel_collectors
+    src/collector.c
+    src/cpu_collector.c
+    src/memory_collector.c
+)
+
+target_include_directories(sentinel_collectors
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/common/include
+)
+
+target_link_libraries(sentinel_collectors
+    PRIVATE
+        sentinel_common
+)
+
 add_executable(sentineld
     src/main.c
 )
@@ -5,6 +22,11 @@ add_executable(sentineld
 target_include_directories(sentineld
     PRIVATE
         ${PROJECT_SOURCE_DIR}/common/include
+)
+
+target_link_libraries(sentineld
+    PRIVATE
+        sentinel_collectors
 )
 
 target_compile_definitions(sentineld

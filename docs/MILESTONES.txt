@@ -49,6 +49,8 @@ Exit criteria:
 Milestone 1: Telemetry data model
 ---------------------------------
 
+Status: Complete
+
 Objectives:
 
   - Define a common representation for telemetry samples.
@@ -81,6 +83,8 @@ Exit criteria:
 Milestone 2: Userspace collector interface
 -------------------------------------------
 
+Status: Complete
+
 Objectives:
 
   - Define a small interface for independent telemetry collectors.
@@ -104,6 +108,8 @@ Exit criteria:
 
 Milestone 3: CPU and memory telemetry
 --------------------------------------
+
+Status: Complete
 
 Objectives:
 

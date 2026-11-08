@@ -162,4 +162,7 @@ MIT License
 
 Early Development
 
-The project is currently in its initial planning and architecture stage.
+The C17/CMake scaffold and initial userspace telemetry path are implemented.
+The daemon currently samples CPU utilization from `/proc/stat` and memory
+utilization from `/proc/meminfo`; configuration parsing and persistent storage
+are not implemented yet.

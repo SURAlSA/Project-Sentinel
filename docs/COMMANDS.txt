@@ -9,8 +9,8 @@ needed to build, test, run, and publish it.
 1. What currently exists
 ------------------------
 
-Project Sentinel is currently an early C17/CMake scaffold. It does not collect
-real telemetry yet.
+Project Sentinel is an early C17/CMake project. The daemon currently collects
+CPU utilization from `/proc/stat` and memory utilization from `/proc/meminfo`.
 
 The current components are:
 
@@ -19,17 +19,23 @@ The current components are:
       enables CTest, and applies compiler warnings.
 
   daemon/src/main.c
-      A userspace daemon placeholder named "sentineld". It:
+      The userspace daemon named "sentineld". It:
         - accepts --config PATH
         - accepts --version
         - accepts --help
         - installs SIGINT and SIGTERM handlers
+        - samples CPU and memory telemetry once per second
+        - displays successful samples and reports collection errors
         - stays running until it receives a shutdown signal
-        - prints startup and shutdown messages
-      It does not yet parse the TOML file or collect telemetry.
 
   daemon/CMakeLists.txt
-      Builds the sentineld executable and registers a basic CTest test.
+      Builds the daemon and collector library.
+
+  daemon/include/sentinel/
+      Public collector interface and CPU/memory collector declarations.
+
+  daemon/src/cpu_collector.c and memory_collector.c
+      Parse Linux procfs data and produce utilization telemetry samples.
 
   common/include/sentinel/version.h
       Shared project name and version constants.
@@ -100,8 +106,9 @@ Run the registered tests with:
 
   ctest --test-dir build --output-on-failure
 
-The current test verifies that the daemon can report its version successfully.
-The test suite will grow as telemetry and other subsystems are implemented.
+The tests verify daemon version output, telemetry sample validation, collector
+invocation and failure reporting, and CPU/memory parser behavior. Parser tests
+use controlled input rather than depending on the host's current procfs values.
 
 The equivalent complete local check is:
 
@@ -278,7 +285,7 @@ You can view the result in the repository's GitHub Actions tab.
 This scaffold intentionally does not yet:
 
   - read or validate TOML configuration
-  - collect CPU, memory, disk, network, or sensor telemetry
+  - collect disk, network, or hardware-sensor telemetry
   - persist data in SQLite
   - expose a REST or MQTT interface
   - generate alerts
