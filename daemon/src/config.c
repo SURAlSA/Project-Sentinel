@@ -1,3 +1,5 @@
+// tells the compiler that the program wants access to POSIX.1-2008 functionality.
+// POSIX is a standard that defines interfaces for Unix-like operating systems, including Linux.
 #define _POSIX_C_SOURCE 200809L
 
 #include "sentinel/config.h"
