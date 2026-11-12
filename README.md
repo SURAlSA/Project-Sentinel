@@ -165,5 +165,6 @@ Early Development
 The C17/CMake scaffold and initial userspace telemetry path are implemented.
 The daemon currently samples CPU utilization from `/proc/stat` and memory
 utilization from `/proc/meminfo`, loading sampling and diagnostic settings from
-the selected configuration file. Persistent storage and remote communication
-are not implemented yet.
+the selected configuration file. Sampling uses monotonic deadlines and
+structured sample output. Persistent storage and remote communication are not
+implemented yet.

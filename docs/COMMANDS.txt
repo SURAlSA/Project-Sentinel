@@ -26,7 +26,7 @@ The current components are:
         - installs SIGINT and SIGTERM handlers
         - loads and validates the selected configuration file before startup
         - samples CPU and memory telemetry at the configured interval
-        - displays successful samples and reports collection errors
+        - displays structured sample records and reports collection errors
         - stays running until it receives a shutdown signal
 
   daemon/CMakeLists.txt
@@ -42,6 +42,10 @@ The current components are:
   daemon/src/config.c
       Loads the supported configuration settings and rejects malformed,
       duplicate, unknown, or out-of-range values.
+
+  daemon/src/scheduler.c
+      Schedules sampling against monotonic deadlines and skips missed
+      intervals instead of trying to catch up with rapid extra samples.
 
   common/include/sentinel/version.h
       Shared project name and version constants.
@@ -144,9 +148,16 @@ SIGTERM from another terminal:
   kill -TERM <process-id>
 
 The selected configuration is loaded before startup. The daemon prints the
-active settings and then reports CPU and memory utilization. Missing or invalid
-configuration prevents startup. Sampling intervals must be between 100 and
-60000 milliseconds. Log levels are debug, info, warn, or error.
+active settings and then reports CPU and memory utilization as structured
+records, for example:
+
+  sample timestamp_ms=1794470000000 metric=memory.utilization value=55.25 unit=% source=none
+
+The scheduler uses monotonic time, so wall-clock adjustments do not change the
+sampling cadence. If a collection takes longer than its interval, missed ticks
+are skipped. Missing or invalid configuration prevents startup. Sampling
+intervals must be between 100 and 60000 milliseconds. Log levels are debug,
+info, warn, or error.
 
 The database path is validated as a non-empty quoted path but is not opened
 until storage is implemented. Enabling remote telemetry is reported as

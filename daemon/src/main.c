@@ -2,12 +2,14 @@
 
 #include <errno.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -15,6 +17,7 @@
 #include "sentinel/config.h"
 #include "sentinel/cpu_collector.h"
 #include "sentinel/memory_collector.h"
+#include "sentinel/scheduler.h"
 #include "sentinel/version.h"
 
 static volatile sig_atomic_t keep_running = 1;
@@ -66,6 +69,79 @@ static int install_signal_handlers(void)
     return 0;
 }
 
+static int wait_for_next_sample(struct sampling_scheduler *scheduler)
+{
+    sigset_t shutdown_signals;
+    sigset_t previous_mask;
+    sigset_t wait_mask;
+    struct timespec now;
+    struct timespec deadline;
+    int wait_error = 0;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) == -1) {
+        return -1;
+    }
+    if (sampling_scheduler_next_deadline(scheduler, &now, &deadline) == -1) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (sigemptyset(&shutdown_signals) == -1 ||
+        sigaddset(&shutdown_signals, SIGINT) == -1 ||
+        sigaddset(&shutdown_signals, SIGTERM) == -1 ||
+        sigprocmask(SIG_BLOCK, &shutdown_signals, &previous_mask) == -1) {
+        return -1;
+    }
+    /*
+     * Keep shutdown signals blocked while checking the flag. pselect atomically
+     * unmasks them while waiting, so a signal cannot arrive in a check/wait gap.
+     */
+    wait_mask = previous_mask;
+    if (sigdelset(&wait_mask, SIGINT) == -1 ||
+        sigdelset(&wait_mask, SIGTERM) == -1) {
+        const int saved_errno = errno;
+        (void)sigprocmask(SIG_SETMASK, &previous_mask, NULL);
+        errno = saved_errno;
+        return -1;
+    }
+
+    while (keep_running) {
+        struct timespec remaining;
+        int result;
+
+        if (clock_gettime(CLOCK_MONOTONIC, &now) == -1) {
+            wait_error = errno;
+            break;
+        }
+        if (now.tv_sec > deadline.tv_sec ||
+            (now.tv_sec == deadline.tv_sec &&
+             now.tv_nsec >= deadline.tv_nsec)) {
+            break;
+        }
+        remaining.tv_sec = deadline.tv_sec - now.tv_sec;
+        remaining.tv_nsec = deadline.tv_nsec - now.tv_nsec;
+        if (remaining.tv_nsec < 0) {
+            --remaining.tv_sec;
+            remaining.tv_nsec += 1000000000L;
+        }
+
+        result = pselect(0, NULL, NULL, NULL, &remaining, &wait_mask);
+        if (result == -1 && errno != EINTR) {
+            wait_error = errno;
+            break;
+        }
+    }
+
+    if (sigprocmask(SIG_SETMASK, &previous_mask, NULL) == -1) {
+        return -1;
+    }
+    if (wait_error != 0) {
+        errno = wait_error;
+        return -1;
+    }
+    return 0;
+}
+
 static void run_collectors(const struct telemetry_collector *collectors,
                            size_t collector_count,
                            enum sentinel_log_level log_level)
@@ -78,7 +154,10 @@ static void run_collectors(const struct telemetry_collector *collectors,
                                         sizeof(error));
 
         if (result == COLLECTOR_SUCCESS) {
-            printf("%s=%.2f %s\n", sample.metric, sample.value, sample.unit);
+            printf("sample timestamp_ms=%" PRId64 " metric=%s value=%.2f "
+                   "unit=%s source=%s\n",
+                   sample.timestamp_ms, sample.metric, sample.value,
+                   sample.unit, sample.source != NULL ? sample.source : "none");
         } else if (result == COLLECTOR_FAILURE) {
             log_message(log_level, SENTINEL_LOG_ERROR, "%s collector: %s",
                         collectors[i].name, error);
@@ -94,7 +173,9 @@ int main(int argc, char **argv)
     char config_error[512];
     struct cpu_collector_state cpu_state;
     struct memory_collector_state memory_state;
+    struct sampling_scheduler scheduler;
     struct telemetry_collector collectors[2];
+    struct timespec scheduler_start;
     static const struct option options[] = {
         {"config", required_argument, NULL, 'c'},
         {"help", no_argument, NULL, 'h'},
@@ -138,6 +219,17 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    if (clock_gettime(CLOCK_MONOTONIC, &scheduler_start) == -1) {
+        fprintf(stderr, "sentineld: unable to initialize sampling scheduler: %s\n",
+                strerror(errno));
+        return EXIT_FAILURE;
+    }
+    if (sampling_scheduler_init(&scheduler, config.sampling_interval_ms,
+                                &scheduler_start) == -1) {
+        fprintf(stderr, "sentineld: invalid sampling scheduler configuration\n");
+        return EXIT_FAILURE;
+    }
+
     cpu_collector_init(&collectors[0], &cpu_state, NULL);
     memory_collector_init(&collectors[1], &memory_state, NULL);
 
@@ -158,17 +250,12 @@ int main(int argc, char **argv)
                 "collecting CPU and memory telemetry");
 
     while (keep_running) {
-        const struct timespec interval = {
-            .tv_sec = config.sampling_interval_ms / 1000,
-            .tv_nsec = (long)(config.sampling_interval_ms % 1000) * 1000000L,
-        };
-
         run_collectors(collectors, sizeof(collectors) / sizeof(collectors[0]),
                        config.log_level);
-        if (keep_running) {
-            while (nanosleep(&interval, NULL) == -1 && errno == EINTR &&
-                   keep_running) {
-            }
+        if (keep_running && wait_for_next_sample(&scheduler) == -1) {
+            log_message(config.log_level, SENTINEL_LOG_ERROR,
+                        "sampling scheduler failed: %s", strerror(errno));
+            return EXIT_FAILURE;
         }
     }
 

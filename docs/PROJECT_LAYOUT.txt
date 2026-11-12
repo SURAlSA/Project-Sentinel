@@ -19,7 +19,7 @@ daemon/
 -------
 The userspace daemon. include/sentinel/ contains config and collector
 interfaces. src/ contains startup/lifecycle code, configuration loading, and
-CPU/memory procfs collectors.
+CPU/memory procfs collectors, plus monotonic sampling scheduler.
 
 docs/
 -----
@@ -42,7 +42,7 @@ Reserved for development or maintenance scripts; currently empty.
 tests/
 ------
 CTest programs for telemetry samples, collector behavior/parsing, and
-configuration loading and validation.
+configuration loading and validation, scheduling, and daemon shutdown.
 
 .github/workflows/
 ------------------

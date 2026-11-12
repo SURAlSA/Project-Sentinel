@@ -30,3 +30,22 @@ target_link_libraries(test_config
 )
 
 add_test(NAME config COMMAND test_config)
+
+add_executable(test_scheduler
+    test_scheduler.c
+)
+
+target_link_libraries(test_scheduler
+    PRIVATE
+        sentinel_collectors
+)
+
+add_test(NAME scheduler COMMAND test_scheduler)
+
+add_executable(test_daemon_lifecycle
+    test_daemon_lifecycle.c
+)
+
+add_test(NAME daemon_lifecycle
+    COMMAND test_daemon_lifecycle $<TARGET_FILE:sentineld>
+)
