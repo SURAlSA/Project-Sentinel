@@ -181,6 +181,8 @@ Exit criteria:
 Milestone 5: Sampling and daemon lifecycle
 -------------------------------------------
 
+Status: Implemented; CPU-overhead measurement remains.
+
 Objectives:
 
   - Turn the daemon placeholder into a real sampling process.
@@ -201,7 +203,8 @@ Exit criteria:
   - SIGINT and SIGTERM stop the daemon cleanly.
   - A failed collector does not silently terminate the whole process.
   - Scheduling does not drift unnecessarily over time.
-  - CPU overhead remains appropriate for embedded devices.
+  - CPU overhead remains appropriate for embedded devices (benchmarking
+    remains to be done).
 
 
 Milestone 6: Test framework expansion

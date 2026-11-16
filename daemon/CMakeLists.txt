@@ -3,6 +3,7 @@ add_library(sentinel_collectors
     src/config.c
     src/cpu_collector.c
     src/memory_collector.c
+    src/scheduler.c
 )
 
 target_include_directories(sentinel_collectors
